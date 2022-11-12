@@ -46,47 +46,55 @@ private:
     virtual Ret process(Args... args) = 0;
 };
 
-#define MIDF_DECL_PORT(port) const int midf_port = port;
+#define MIDF_DECL_PORT(service_name, port) \
+    namespace service_name { \
+        const int midf_port = port; \
+    }
 
 #define LOCAL_HOST "127.0.0.1"
 
-#define MIDF_DECL_FUNC(ret_t, name, ...) \
-    template <typename ...Args> \
-    ret_t name(Args... args) { \
-        lrrp::client cli(LOCAL_HOST, midf_port); \
-        auto req = lrrp::request_builder(#name).set_json(parameter_pack_to_json<Args...>(args...)).build(); \
-        auto res = cli.send(req); \
-        ret_t ret; \
-        res.get_payload().get_to(ret); \
-        return ret; \
-    } \
-    class handler_base_##name : public midf_handler<ret_t, __VA_ARGS__> {};
+#define MIDF_DECL_FUNC(ret_t, service_name, name, ...) \
+    namespace service_name { \
+        template <typename ...Args> \
+        ret_t name(Args... args) { \
+            lrrp::client cli(LOCAL_HOST, midf_port); \
+            auto req = lrrp::request_builder(#name).set_json(parameter_pack_to_json<Args...>(args...)).build(); \
+            auto res = cli.send(req); \
+            ret_t ret; \
+            res.get_payload().get_to(ret); \
+            return ret; \
+        } \
+        class handler_base_##name : public midf_handler<ret_t, __VA_ARGS__> {}; \
+    }
 
-#define MIDF_DECL_FUNC_NO_ARGS(ret_t, name) \
-    template <typename ...Args> \
-    ret_t name(Args... args) { \
-        lrrp::client cli(LOCAL_HOST, midf_port); \
-        auto req = lrrp::request_builder(#name).set_json(parameter_pack_to_json<Args...>(args...)).build(); \
-        auto res = cli.send(req); \
-        ret_t ret; \
-        res.get_payload().get_to(ret); \
-        return ret; \
-    } \
-    class handler_base_##name : public midf_handler<ret_t> {};
+#define MIDF_DECL_FUNC_NO_ARGS(ret_t, service_name, name) \
+    namespace service_name { \
+        ret_t name() { \
+            lrrp::client cli(LOCAL_HOST, midf_port); \
+            auto req = lrrp::request_builder(#name).set_json(nlohmann::json::object({})).build(); \
+            auto res = cli.send(req); \
+            ret_t ret; \
+            res.get_payload().get_to(ret); \
+            return ret; \
+        } \
+        class handler_base_##name : public midf_handler<ret_t> {}; \
+    }
 
-#define MIDF_IMPL_FUNC(ret_t, name, ...) \
-    class handler_impl_##name : public handler_base_##name \
+#define MIDF_IMPL_FUNC(ret_t, service_name, name, ...) \
+    class handler_impl_##service_name##_##name : public service_name::handler_base_##name \
     { \
     private: \
         virtual ret_t process(__VA_ARGS__) override; \
     }; \
-    int id_##name = midf_server.add_handler(#name, [](const lrrp::request& req) -> lrrp::response { \
-        static handler_impl_##name name; \
+    int id_##name = service_name##_midf_server.add_handler(#name, [](const lrrp::request& req) -> lrrp::response { \
+        static handler_impl_##service_name##_##name name; \
         return name.handle(req); \
     }); \
-    ret_t handler_impl_##name::process
+    ret_t handler_impl_##service_name##_##name::process
 
-#define INIT_MIDF_SERVER() lrrp::server midf_server(midf_port);
-#define START_MIDF_SERVER() midf_server.run();
+#define INIT_MIDF_SERVER(service_name) lrrp::server service_name##_midf_server(service_name::midf_port);
+#define START_MIDF_SERVER(service_name) service_name##_midf_server.run();
+
+#define CALL_BACK
 
 #endif
