@@ -2,6 +2,8 @@
 #define MIDF_HPP_
 
 #include <functional>
+#include <stdexcept>
+#include <limits>
 
 #include <lrrp.h>
 
@@ -51,6 +53,20 @@ private:
 
 #define LOCAL_HOST "127.0.0.1"
 
+namespace midf {
+    class remote_call_error : public std::exception {
+    private:
+        char* m_msg;
+
+    public:
+        remote_call_error(char* msg) : m_msg(msg) {}
+
+        char* what() {
+            return m_msg;
+        }
+    };
+}
+
 #define MIDF_DECL_FUNC(ret_t, service_name, name, ...) \
     namespace service_name { \
         template <typename ...Args> \
@@ -59,8 +75,12 @@ private:
             auto req = lrrp::request_builder(#name).set_json(parameter_pack_to_json<Args...>(args...)).build(); \
             auto res = cli.send(req); \
             ret_t ret; \
-            res.get_payload().get_to(ret); \
-            return ret; \
+            try { \
+                res.get_payload().get_to(ret); \
+                return ret; \
+            } catch(const std::exception&) { \
+                throw midf::remote_call_error("could not get the result"); \
+            } \
         } \
         class handler_base_##name : public midf_handler<ret_t, __VA_ARGS__> {}; \
     }
@@ -72,8 +92,12 @@ private:
             auto req = lrrp::request_builder(#name).set_json(nlohmann::json::object({})).build(); \
             auto res = cli.send(req); \
             ret_t ret; \
-            res.get_payload().get_to(ret); \
-            return ret; \
+            try { \
+                res.get_payload().get_to(ret); \
+                return ret; \
+            } catch(const std::exception&) { \
+                throw midf::remote_call_error("could not get the result"); \
+            } \
         } \
         class handler_base_##name : public midf_handler<ret_t> {}; \
     }
@@ -94,12 +118,27 @@ private:
     namespace service_name { \
         const int midf_port = port; } \
     MIDF_DECL_FUNC_NO_ARGS(bool, service_name, ping); \
+    namespace service_name { \
+        using namespace std::chrono_literals; \
+        bool wait_startup(uint64_t iterations = 1000/*as a result 10s by default*/, std::chrono::milliseconds delta = 10ms) { \
+            for(uint64_t i = 0; i < iterations; ++i) { \
+                try { \
+                    if(service_name::ping()) { \
+                        return true; \
+                    } \
+                } catch(const std::exception&) {} \
+                std::this_thread::sleep_for(delta); \
+            } \
+            return false; \
+        } \
+    }
 
 #define INIT_MIDF_SERVER(service_name) \
     lrrp::server service_name##_midf_server(service_name::midf_port); \
     MIDF_IMPL_FUNC(bool, service_name, ping) () { return true; }
 
 #define START_MIDF_SERVER(service_name) \
+    supervisor::wait_startup(10000, 10ms); /*it waits 100s*/ \
     supervisor::inform_about_me(AS_CALL_BACK(service_name, ping, bool)); \
     service_name##_midf_server.run();
 
