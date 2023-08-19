@@ -4,6 +4,7 @@
 #include <functional>
 #include <stdexcept>
 #include <limits>
+#include <chrono>
 
 #include <lrrp.h>
 
@@ -138,6 +139,7 @@ namespace midf {
     MIDF_IMPL_FUNC(bool, service_name, ping) () { return true; }
 
 #define START_MIDF_SERVER(service_name) \
+    using namespace std::chrono_literals; \
     supervisor::wait_startup(10000, 10ms); /*it waits 100s*/ \
     supervisor::inform_about_me(AS_CALL_BACK(service_name, ping, bool)); \
     service_name##_midf_server.run();
