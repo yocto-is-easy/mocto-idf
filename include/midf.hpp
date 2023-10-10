@@ -195,6 +195,45 @@ namespace midf {
         j.at("service_name").get_to(f.m_service_name);
     }
 
+    class JsonAs {
+    private:
+        nlohmann::json m_json;
+
+    public:
+        JsonAs() {
+            m_json = nlohmann::json::object({});
+        }
+
+        nlohmann::json& get() {
+            return m_json;
+        }
+
+        const nlohmann::json& get_const() const {
+            return m_json;
+        }
+
+        static std::string serialize(const JsonAs& j) {
+            return lrrp::base64::encode(j.get_const().dump());
+        }
+
+        static JsonAs deserialize(std::string s) {
+            JsonAs j;
+            j.get() = nlohmann::json::parse(lrrp::base64::decode(s));
+            return j;
+        }
+    };
+
+    void to_json(nlohmann::json& j, const JsonAs& j_as) {
+        j = JsonAs::serialize(j_as);
+    }
+
+    void from_json(const nlohmann::json& j, JsonAs& j_as) {
+        j_as = JsonAs::deserialize(j.get<std::string>());
+    }
+
+    using JsonAsParam = JsonAs;
+    using JsonAsRet = JsonAs;
+
 } // namespace midf
 
 #define AS_CALL_BACK(service_name, function_name, ...) \
