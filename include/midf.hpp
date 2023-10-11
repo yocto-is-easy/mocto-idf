@@ -224,11 +224,15 @@ namespace midf {
     };
 
     void to_json(nlohmann::json& j, const JsonAs& j_as) {
-        j = JsonAs::serialize(j_as);
+        j = nlohmann::json {
+            {"json_as_data", JsonAs::serialize(j_as)}
+        };
     }
 
     void from_json(const nlohmann::json& j, JsonAs& j_as) {
-        j_as = JsonAs::deserialize(j.get<std::string>());
+        std::string s;
+        j.at("json_as_data").get_to(s);
+        j_as = JsonAs::deserialize(s);
     }
 
     using JsonAsParam = JsonAs;
