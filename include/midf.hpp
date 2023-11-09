@@ -204,6 +204,10 @@ namespace midf {
             m_json = nlohmann::json::object({});
         }
 
+        JsonAs(const nlohmann::json& j) {
+            m_json = j;
+        }
+
         nlohmann::json& get() {
             return m_json;
         }
