@@ -203,6 +203,11 @@ namespace midf {
         j.at("service_name").get_to(f.m_service_name);
     }
 
+    class JsonAs;
+
+    void to_json(nlohmann::json& j, const JsonAs& j_as);
+    void from_json(const nlohmann::json& j, JsonAs& j_as);
+
     class JsonAs {
     private:
         nlohmann::json m_json;
