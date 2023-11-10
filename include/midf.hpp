@@ -38,13 +38,21 @@ class midf_handler : public lrrp::handler_base
 {
 public:
     virtual lrrp::response handle(const lrrp::request& req) final {
-        std::function<Ret(Args...)> f = [=](Args... args) -> Ret { return this->process(args...); };
-        nlohmann::json payload = call_json(f, req.params());
-        lrrp::response res = lrrp::response_builder()
-            .set_payload(payload)
-            .set_status(lrrp::status_type::ok)
-            .build();
-        return res;
+        try {
+            std::function<Ret(Args...)> f = [=](Args... args) -> Ret { return this->process(args...); };
+            nlohmann::json payload = call_json(f, req.params());
+            lrrp::response res = lrrp::response_builder()
+                .set_payload(payload)
+                .set_status(lrrp::status_type::ok)
+                .build();
+            return res;
+        } catch(const std::exception& e) {
+            printf("midf_handler::handle: %s\n", e.what());
+            lrrp::response res = lrrp::response_builder()
+                .set_status(lrrp::status_type::internal_error)
+                .build();
+            return res;
+        }
     }
 
 private:
@@ -245,6 +253,7 @@ namespace midf {
 
     using JsonAsParam = JsonAs;
     using JsonAsRet = JsonAs;
+    using JsonAsVar = JsonAs;
 
 } // namespace midf
 
